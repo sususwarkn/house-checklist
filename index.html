@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>看房 Checklist</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --brand: #6BBFC3;
+    --brand-light: #D6F4F6;
+    --brand-lighter: #EAF9FA;
+    --brand-dark: #3A8F93;
+    --brand-deep: #2A6B6E;
+    --text-primary: #1a1a1a;
+    --text-secondary: #555;
+    --text-tertiary: #999;
+    --glass-bg: rgba(255, 255, 255, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.7);
+    --glass-shadow: rgba(60, 120, 120, 0.06);
+    --glass-inset: rgba(255, 255, 255, 0.6);
+    --accent-green: #3A9E7E;
+    --accent-amber: #C08B30;
+    --accent-red: #C0453A;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    background: #E4F3F4;
+    background-image:
+      radial-gradient(ellipse at 15% 30%, rgba(166, 222, 225, 0.5) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 15%, rgba(180, 215, 230, 0.4) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 85%, rgba(200, 230, 220, 0.35) 0%, transparent 50%),
+      radial-gradient(ellipse at 75% 55%, rgba(214, 244, 246, 0.4) 0%, transparent 40%);
+    background-attachment: fixed;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-bottom: 1px solid #eee;
+    padding: 14px 20px 0;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--brand-deep);
+  }
+
+  .header .subtitle {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-left: 6px;
+    font-weight: 500;
+  }
+
+  /* ---- Tabs ---- */
+  .tabs {
+    display: flex;
+    gap: 0;
+    position: relative;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.25s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab.active {
+    color: var(--brand-dark);
+  }
+
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-dark));
+  }
+
+  /* ---- Progress (in checklist tab) ---- */
+  .progress-wrap {
+    padding: 0 20px;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid #eee;
+  }
+
+  .progress-bar {
+    height: 3px;
+    background: #e8e8e8;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-light), var(--brand), var(--brand-dark));
+    border-radius: 2px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 0%;
+  }
+
+  .progress-text {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-align: right;
+    padding: 4px 0 8px;
+    font-weight: 500;
+  }
+
+  /* ---- Container ---- */
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 14px 16px 100px;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ---- House Info Inputs ---- */
+  .house-info {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 4px 0;
+    margin-bottom: 12px;
+    box-shadow:
+      0 4px 20px var(--glass-shadow),
+      inset 0 1px 0 var(--glass-inset);
+  }
+
+  .house-field {
+    display: flex;
+    align-items: center;
+    padding: 12px 18px;
+    gap: 10px;
+  }
+
+  .house-field + .house-field {
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .house-field label {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .house-field input {
+    flex: 1;
+    border: none;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+  }
+
+  .house-field input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  /* ---- Sections ---- */
+  .section {
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px 16px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid #f0f0f0;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-primary);
+    box-shadow:
+      0 4px 16px var(--glass-shadow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .section-title .icon { font-size: 17px; }
+
+  .section-title .section-progress {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    background: rgba(0,0,0,0.03);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .section-items {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px var(--glass-shadow);
+  }
+
+  /* ---- Check Items ---- */
+  .check-item {
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .check-item:last-child { border-bottom: none; }
+
+  .item-main {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .item-main:active {
+    background: rgba(214, 244, 246, 0.25);
+  }
+
+  .item-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1.5px solid #ccc;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #fff;
+  }
+
+  .item-checkbox.checked {
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(107, 191, 195, 0.35);
+  }
+
+  .item-checkbox.checked::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+
+  .item-label {
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+    color: var(--text-primary);
+  }
+
+  .item-expand {
+    width: 16px;
+    height: 16px;
+    color: var(--text-tertiary);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+  }
+
+  .item-expand.open { transform: rotate(90deg); }
+
+  /* ---- Sub Options ---- */
+  .sub-options {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(248, 252, 252, 0.6);
+  }
+
+  .sub-options.open { max-height: 500px; }
+
+  .sub-options-inner {
+    padding: 2px 16px 12px 48px;
+  }
+
+  .sub-option {
+    display: flex;
+    align-items: center;
+    padding: 7px 0;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .radio-circle {
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    border: 1.5px solid #ccc;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    background: #fff;
+  }
+
+  .radio-circle.selected {
+    border-color: var(--brand-dark);
+    background: rgba(255, 255, 255, 0.45);
+  }
+
+  .radio-circle.selected::after {
+    content: '';
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  }
+
+  .sub-option-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* ---- Text Input ---- */
+  .text-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.25s;
+    margin-top: 2px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text-primary);
+    resize: vertical;
+  }
+
+  .text-input::placeholder { color: var(--text-tertiary); }
+
+  .text-input:focus {
+    border-color: var(--brand);
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(107, 191, 195, 0.1);
+  }
+
+  /* ---- Scoring ---- */
+  .scoring-section {
+    margin-top: 16px;
+    margin-bottom: 12px;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 10px;
+    box-shadow:
+      0 6px 24px var(--glass-shadow),
+      inset 0 1px 0 var(--glass-inset);
+  }
+
+  .glass-card h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: var(--text-primary);
+  }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 10px;
+  }
+
+  .score-row:last-of-type { border-bottom: none; }
+
+  .score-label {
+    font-size: 13px;
+    font-weight: 600;
+    width: 64px;
+    flex-shrink: 0;
+    color: var(--text-primary);
+  }
+
+  .score-hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+  }
+
+  .score-input {
+    width: 48px;
+    padding: 5px 6px;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    font-family: inherit;
+    outline: none;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--text-primary);
+    transition: all 0.2s;
+  }
+
+  .score-input:focus {
+    border-color: rgba(107, 191, 195, 0.5);
+    box-shadow: 0 2px 8px rgba(107, 191, 195, 0.12);
+  }
+
+  .total-score {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0 0;
+    border-top: 1px solid #eee;
+    margin-top: 6px;
+  }
+
+  .total-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .total-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-primary);
+    transition: color 0.3s;
+  }
+
+  .total-value.green { color: var(--accent-green); }
+  .total-value.yellow { color: var(--accent-amber); }
+  .total-value.orange { color: #C06030; }
+  .total-value.red { color: var(--accent-red); }
+
+  .verdict {
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 10px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .verdict.a { background: rgba(58, 158, 126, 0.1); color: var(--accent-green); border: 1px solid rgba(58, 158, 126, 0.18); }
+  .verdict.b { background: rgba(192, 139, 48, 0.1); color: var(--accent-amber); border: 1px solid rgba(192, 139, 48, 0.18); }
+  .verdict.c { background: rgba(192, 69, 58, 0.08); color: var(--accent-red); border: 1px solid rgba(192, 69, 58, 0.15); }
+  .verdict.d { background: rgba(255, 255, 255, 0.2); color: var(--text-tertiary); }
+
+  /* ---- Tier Cards ---- */
+  .tier-card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 8px;
+    box-shadow: 0 3px 16px var(--glass-shadow);
+  }
+
+  .tier-card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+  }
+
+  .tier-card ul {
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .tier-card ul li { margin-bottom: 2px; }
+
+  .tier-a { border-left: 3px solid rgba(58, 158, 126, 0.5); }
+  .tier-b { border-left: 3px solid rgba(192, 139, 48, 0.5); }
+  .tier-c { border-left: 3px solid rgba(192, 69, 58, 0.4); }
+
+  /* ---- Bottom Bar ---- */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    padding: 10px 20px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    max-width: 100%;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
+  }
+
+  .btn {
+    flex: 1;
+    max-width: 200px;
+    padding: 11px 0;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+  }
+
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(107, 191, 195, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--text-secondary);
+    border: 1px solid #e0e0e0;
+  }
+
+  /* ---- History Page ---- */
+  .history-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-tertiary);
+  }
+
+  .history-empty .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  .history-empty p {
+    font-size: 14px;
+  }
+
+  .history-item {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px var(--glass-shadow), inset 0 1px 0 var(--glass-inset);
+  }
+
+  .history-item:active {
+    background: rgba(214, 244, 246, 0.3);
+    transform: scale(0.99);
+  }
+
+  .history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .history-item-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .history-item-date {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    margin-left: 12px;
+    margin-top: 3px;
+  }
+
+  .history-item-addr {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .history-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .history-item-score {
+    font-weight: 700;
+    color: var(--brand-dark);
+  }
+
+  .history-item-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .btn-sm {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+
+  .btn-sm:active { opacity: 0.7; }
+
+  .btn-sm-primary {
+    background: rgba(107, 191, 195, 0.15);
+    color: var(--brand-dark);
+  }
+
+  .btn-sm-danger {
+    background: rgba(192, 69, 58, 0.08);
+    color: var(--accent-red);
+  }
+
+  /* ---- Photo Card ---- */
+  .photo-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 20px var(--glass-shadow), inset 0 1px 0 var(--glass-inset);
+  }
+
+  .photo-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .photo-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .photo-count {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .photo-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #f5f5f5;
+  }
+
+  .photo-thumb img,
+  .photo-thumb video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .photo-thumb .video-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .photo-thumb .photo-delete {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    border: none;
+  }
+
+  .photo-thumb:hover .photo-delete,
+  .photo-thumb:active .photo-delete {
+    display: flex;
+  }
+
+  .photo-add-btn {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 1.5px dashed #ccc;
+    background: rgba(255,255,255,0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    gap: 2px;
+  }
+
+  .photo-add-btn:active {
+    background: rgba(214, 244, 246, 0.3);
+    border-color: var(--brand);
+  }
+
+  .photo-add-btn .plus {
+    font-size: 22px;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .photo-file-input {
+    display: none;
+  }
+
+  /* ---- Lightbox ---- */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .lightbox.open {
+    display: flex;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .lightbox-counter {
+    position: absolute;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 10;
+  }
+
+  .lightbox-img-wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 8px;
+  }
+
+  .lightbox-img-wrap img,
+  .lightbox-img-wrap video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .lightbox-prev { left: 10px; }
+  .lightbox-next { right: 10px; }
+
+  .lightbox-nav:active {
+    background: rgba(255,255,255,0.25);
+  }
+
+  /* ---- Scrollbar ---- */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(107, 191, 195, 0.15); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1>看房 Checklist</h1>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tabChecklist" onclick="switchTab('checklist')">清单</div>
+    <div class="tab" id="tabHistory" onclick="switchTab('history')">历史</div>
+  </div>
+</div>
+
+<div class="progress-wrap" id="progressWrap">
+  <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+  <div class="progress-text" id="progressText">0 / 0 已完成</div>
+</div>
+
+<div class="container">
+  <div class="page active" id="pageChecklist"></div>
+  <div class="page" id="pageHistory"></div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-primary" id="btnSave" onclick="handleSave()">保存</button>
+  <button class="btn btn-ghost" onclick="resetAll()">重置</button>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <div class="lightbox-counter" id="lightboxCounter"></div>
+  <button class="lightbox-nav lightbox-prev" onclick="navLightbox(-1);event.stopPropagation()">&#8249;</button>
+  <button class="lightbox-nav lightbox-next" onclick="navLightbox(1);event.stopPropagation()">&#8250;</button>
+  <div class="lightbox-img-wrap" id="lightboxContent"></div>
+</div>
+
+<script>
+const checklistData = [
+  {
+    title: "一、房屋基本信息", icon: "🏠",
+    items: [
+      { label: "房型：一室一厅 / 是否隔断", type: "radio", options: ["一室一厅", "隔断房"] },
+      { label: "面积（约多少㎡）", type: "text", placeholder: "输入面积..." },
+      { label: "楼层 / 总楼层", type: "text", placeholder: "如：6/18" },
+      { label: "朝向（是否正南）", type: "radio", options: ["是", "否"] },
+      { label: "有无电梯", type: "radio", options: ["有", "无"] },
+      { label: "是否独门独户", type: "radio", options: ["是", "否"] },
+      { label: "是否重新签合同/倾向重新签", type: "radio", options: ["是", "否"] },
+      { label: "合同签约对象（房东 / 二房东）", type: "radio", options: ["房东", "二房东"] },
+    ]
+  },
+  {
+    title: "二、费用", icon: "💰",
+    items: [
+      { label: "月租（可谈空间）", type: "text", placeholder: "如：3800" },
+      { label: "押金 / 付款方式", type: "text", placeholder: "如：押一付一" },
+      { label: "是否有中介费", type: "radio", options: ["有", "无"] },
+      { label: "民水民电", type: "radio", options: ["是", "否"] },
+      { label: "燃气费", type: "text", placeholder: "月租包？单独付？" },
+      { label: "物业费", type: "text", placeholder: "房东付？自付？" },
+      { label: "网络费用", type: "text", placeholder: "月租包？单独付？" },
+    ]
+  },
+  {
+    title: "三、采光与通风", icon: "☀️",
+    items: [
+      { label: "卧室是否有直射阳光", type: "radio", options: ["是", "否"] },
+      { label: "客厅是否有窗", type: "radio", options: ["是", "否"] },
+      { label: "楼间距 / 是否遮挡", type: "radio", options: ["无遮挡", "有遮挡"] },
+      { label: "是否有对流通风", type: "radio", options: ["是", "否"] },
+    ]
+  },
+  {
+    title: "四、噪音", icon: "🔇",
+    items: [
+      { label: "是否临主路", type: "radio", options: ["是", "否"] },
+      { label: "是否靠高架 / 地铁", type: "radio", options: ["是", "否"] },
+      { label: "楼上是否吵", type: "radio", options: ["是", "否"] },
+      { label: "隔音情况", type: "radio", options: ["可以", "不可以"] },
+      { label: "夜晚环境（问租客）", type: "text", placeholder: "噪音情况描述..." },
+    ]
+  },
+  {
+    title: "五、房屋结构", icon: "🏗️",
+    items: [
+      { label: "是否暗厅", type: "radio", options: ["是", "否"] },
+      { label: "是否暗厨", type: "radio", options: ["是", "否"] },
+      { label: "厨房是否封闭", type: "radio", options: ["是", "否"] },
+      { label: "卫生间是否干湿分离", type: "radio", options: ["是", "否"] },
+      { label: "房间是否方正", type: "radio", options: ["是", "否"] },
+    ]
+  },
+  {
+    title: "六、设施", icon: "🔌",
+    items: [
+      { label: "空调数量 / 是否正常", type: "text", placeholder: "数量及状态..." },
+      { label: "洗衣机", type: "radio", options: ["有", "无"] },
+      { label: "冰箱", type: "radio", options: ["有", "无"] },
+      { label: "热水器", type: "radio", options: ["有", "无"] },
+      { label: "燃气灶", type: "radio", options: ["有", "无"] },
+      { label: "家具是否齐全", type: "radio", options: ["是", "否"] },
+    ]
+  },
+  {
+    title: "七、小区环境", icon: "🏘️",
+    items: [
+      { label: "楼道卫生", type: "radio", options: ["干净", "一般", "差"] },
+      { label: "是否有群租", type: "radio", options: ["是", "否"] },
+      { label: "外卖 / 餐饮多不多", type: "radio", options: ["多", "少"] },
+      { label: "垃圾点距离", type: "radio", options: ["近", "远"] },
+    ]
+  },
+  {
+    title: "八、通勤", icon: "🚇",
+    items: [
+      { label: "小区到地铁步行时间", type: "text", placeholder: "如：10分钟" },
+      { label: "地铁线路", type: "text", placeholder: "如：2号线" },
+      { label: "高峰拥挤情况", type: "radio", options: ["不挤", "一般", "很挤"] },
+    ]
+  },
+  {
+    title: "九、转租确认", icon: "📝",
+    items: [
+      { label: "转租原因", type: "text", placeholder: "原因..." },
+      { label: "房东是否同意", type: "radio", options: ["是", "否"] },
+      { label: "押金如何交接", type: "text", placeholder: "交接方式..." },
+      { label: "是否重新签合同", type: "radio", options: ["是", "否"] },
+    ]
+  },
+  {
+    title: "十、维修与责任", icon: "🔧",
+    items: [
+      { label: "家电坏了谁负责", type: "radio", options: ["房东", "租客", "协商"] },
+      { label: "房屋维修责任", type: "radio", options: ["房东", "租客", "协商"] },
+      { label: "是否有物业", type: "radio", options: ["有", "无"] },
+    ]
+  },
+  {
+    title: "十一、合同条款", icon: "📋",
+    items: [
+      { label: "租期（一年 / 可否短）", type: "text", placeholder: "如：一年" },
+      { label: "是否允许提前解约", type: "radio", options: ["是", "否"] },
+      { label: "是否允许转租", type: "radio", options: ["是", "否"] },
+      { label: "提前解约条件", type: "text", placeholder: "条件描述..." },
+    ]
+  },
+];
+
+const scoreItems = [
+  { key: "light", label: "采光", hint: "南向无遮挡 8-10；一般 5-7；暗 0-4" },
+  { key: "quiet", label: "安静", hint: "远离主路 8-10；偶尔车声 5-7；明显吵 0-4" },
+  { key: "commute", label: "通勤", hint: "≤30min 8-10；30-40min 5-7；>40min 0-4" },
+  { key: "structure", label: "房屋结构", hint: "方正一室一厅 8-10；小问题 5-7；隔断暗厅 0-4" },
+  { key: "condition", label: "房屋状态", hint: "家具电器好 8-10；一般 5-7；明显老旧 0-4" },
+  { key: "price", label: "价格", hint: "≤3800 9-10；3800-4000 7-8；>4000 5-6" },
+];
+
+// ---- State ----
+let state = {};
+let currentId = null; // null = new unsaved, string = saved record id
+let currentTab = 'checklist';
+
+function loadState() {
+  const saved = localStorage.getItem('house-cl-current');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      state = parsed.state || {};
+      currentId = parsed.currentId || null;
+    } catch(e) {
+      state = {};
+      currentId = null;
+    }
+  }
+}
+
+function autoSaveState() {
+  localStorage.setItem('house-cl-current', JSON.stringify({ state, currentId }));
+}
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem('house-cl-history') || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveHistory(history) {
+  localStorage.setItem('house-cl-history', JSON.stringify(history));
+}
+
+function getItemKey(sIdx, iIdx) {
+  return `s${sIdx}_i${iIdx}`;
+}
+
+// ---- Tab Switching ----
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabChecklist').className = tab === 'checklist' ? 'tab active' : 'tab';
+  document.getElementById('tabHistory').className = tab === 'history' ? 'tab active' : 'tab';
+  document.getElementById('pageChecklist').className = tab === 'checklist' ? 'page active' : 'page';
+  document.getElementById('pageHistory').className = tab === 'history' ? 'page active' : 'page';
+  document.getElementById('progressWrap').style.display = tab === 'checklist' ? '' : 'none';
+
+  if (tab === 'history') renderHistory();
+  updateBottomBar();
+}
+
+// ---- Bottom Bar ----
+function updateBottomBar() {
+  const btn = document.getElementById('btnSave');
+  if (currentTab === 'history') {
+    btn.textContent = '新建';
+    btn.onclick = handleNew;
+  } else if (currentId) {
+    btn.textContent = '新建';
+    btn.onclick = handleNew;
+  } else {
+    btn.textContent = '保存';
+    btn.onclick = handleSave;
+  }
+}
+
+function handleSave() {
+  const history = getHistory();
+  const id = currentId || ('h_' + Date.now());
+  const totalScore = scoreItems.reduce((sum, si) => sum + (parseInt(state[`score_${si.key}`]) || 0), 0);
+  const totalItems = checklistData.reduce((n, s) => n + s.items.length, 0);
+  const checkedItems = checklistData.reduce((n, section, sIdx) =>
+    n + section.items.filter((_, iIdx) => state[getItemKey(sIdx, iIdx)]?.checked).length, 0);
+
+  const entry = {
+    id,
+    state: { ...state },
+    name: state.houseName || '未命名房源',
+    addr: state.houseAddr || '',
+    savedAt: new Date().toISOString(),
+    totalScore,
+    checkedItems,
+    totalItems,
+  };
+
+  const existIdx = history.findIndex(h => h.id === id);
+  if (existIdx >= 0) {
+    history[existIdx] = entry;
+  } else {
+    history.unshift(entry);
+  }
+
+  saveHistory(history);
+  currentId = id;
+  autoSaveState();
+  updateBottomBar();
+
+  // Brief visual feedback
+  const btn = document.getElementById('btnSave');
+  const origText = btn.textContent;
+  btn.textContent = '已保存';
+  btn.style.background = 'linear-gradient(135deg, var(--accent-green), #2D8068)';
+  setTimeout(() => {
+    btn.style.background = '';
+    updateBottomBar();
+  }, 1200);
+}
+
+function handleNew() {
+  // Auto-save current if it has data
+  const hasData = state.houseName || Object.keys(state).some(k => k.startsWith('s') && state[k]?.checked);
+  if (hasData && !currentId) {
+    handleSave();
+  }
+
+  state = {};
+  currentId = null;
+  autoSaveState();
+  switchTab('checklist');
+  renderChecklist();
+  updateBottomBar();
+}
+
+function resetAll() {
+  if (confirm('确定要清空当前清单所有内容吗？')) {
+    state = {};
+    currentId = null;
+    autoSaveState();
+    renderChecklist();
+    updateBottomBar();
+  }
+}
+
+// ---- Render Checklist ----
+function renderChecklist() {
+  const app = document.getElementById('pageChecklist');
+  let html = '';
+
+  // House name & address
+  html += `<div class="house-info">
+    <div class="house-field">
+      <label>名称</label>
+      <input type="text" id="houseName" placeholder="输入小区名..."
+             value="${escHtml(state.houseName || '')}" oninput="state.houseName=this.value;autoSaveState()">
+    </div>
+    <div class="house-field">
+      <label>地址</label>
+      <input type="text" id="houseAddr" placeholder="输入详细地址..."
+             value="${escHtml(state.houseAddr || '')}" oninput="state.houseAddr=this.value;autoSaveState()">
+    </div>
+  </div>`;
+
+  // Photo card
+  const photos = state.photos || [];
+  html += `<div class="photo-card">
+    <div class="photo-card-header">
+      <span class="photo-card-title">📷 现场照片</span>
+      <span class="photo-count">${photos.length} 张</span>
+    </div>
+    <div class="photo-grid">`;
+
+  photos.forEach((p, idx) => {
+    const isVideo = p.type === 'video';
+    if (isVideo) {
+      html += `<div class="photo-thumb" onclick="openLightbox(${idx})">
+        <video src="${p.src}" muted preload="metadata"></video>
+        <span class="video-badge">视频</span>
+        <button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
+      </div>`;
+    } else {
+      html += `<div class="photo-thumb" onclick="openLightbox(${idx})">
+        <img src="${p.src}" alt="照片${idx+1}">
+        <button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
+      </div>`;
+    }
+  });
+
+  html += `<label class="photo-add-btn">
+      <span class="plus">+</span>
+      <span>拍照/上传</span>
+      <input class="photo-file-input" type="file" accept="image/*,video/*" multiple
+             onchange="handlePhotoUpload(this.files)">
+    </label>
+    </div>
+  </div>`;
+
+  // Checklist sections
+  checklistData.forEach((section, sIdx) => {
+    const completedCount = section.items.filter((_, iIdx) => state[getItemKey(sIdx, iIdx)]?.checked).length;
+
+    html += `<div class="section">
+      <div class="section-title">
+        <span class="icon">${section.icon}</span>
+        ${section.title}
+        <span class="section-progress">${completedCount}/${section.items.length}</span>
+      </div>
+      <div class="section-items">`;
+
+    section.items.forEach((item, iIdx) => {
+      const key = getItemKey(sIdx, iIdx);
+      const itemState = state[key] || {};
+      const checked = itemState.checked || false;
+      const expanded = itemState.expanded !== undefined ? itemState.expanded : true;
+      const selectedOption = itemState.selectedOption ?? null;
+      const textValue = itemState.textValue || '';
+      const hasSubOptions = item.type === 'radio' || item.type === 'text';
+
+      const arrowSvg = `<svg class="item-expand ${expanded ? 'open' : ''}" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M7.21 14.77a.75.75 0 01.02-1.06L11.17 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"/>
+      </svg>`;
+
+      html += `<div class="check-item">
+        <div class="item-main" onclick="toggleItem('${key}')">
+          <div class="item-checkbox ${checked ? 'checked' : ''}"></div>
+          <span class="item-label">${item.label}</span>
+          ${hasSubOptions ? arrowSvg : ''}
+        </div>`;
+
+      if (hasSubOptions) {
+        html += `<div class="sub-options ${expanded ? 'open' : ''}"><div class="sub-options-inner">`;
+        if (item.type === 'radio') {
+          item.options.forEach((opt, oIdx) => {
+            html += `<div class="sub-option" onclick="selectOption('${key}', ${oIdx});event.stopPropagation()">
+              <div class="radio-circle ${selectedOption === oIdx ? 'selected' : ''}"></div>
+              <span class="sub-option-label">${opt}</span>
+            </div>`;
+          });
+        } else if (item.type === 'text') {
+          html += `<input class="text-input" type="text" placeholder="${item.placeholder || ''}"
+                    value="${escHtml(textValue)}" oninput="setTextValue('${key}', this.value)"
+                    onclick="event.stopPropagation()">`;
+        }
+        html += `</div></div>`;
+      }
+      html += `</div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  // Scoring
+  html += `<div class="scoring-section"><div class="glass-card">
+    <h2>10 秒评分法（每项 0-10 分）</h2>`;
+
+  scoreItems.forEach(si => {
+    const val = state[`score_${si.key}`] ?? '';
+    html += `<div class="score-row">
+      <span class="score-label">${si.label}</span>
+      <span class="score-hint">${si.hint}</span>
+      <input class="score-input" type="number" min="0" max="10" value="${val}"
+             onchange="setScore('${si.key}', this.value)" placeholder="-">
+    </div>`;
+  });
+
+  const total = scoreItems.reduce((sum, si) => sum + (parseInt(state[`score_${si.key}`]) || 0), 0);
+  const hasScores = scoreItems.some(si => state[`score_${si.key}`] != null);
+  let colorClass = '', verdict = '', verdictClass = 'd';
+  if (hasScores) {
+    if (total >= 50) { colorClass = 'green'; verdict = '可以认真谈价'; verdictClass = 'a'; }
+    else if (total >= 40) { colorClass = 'yellow'; verdict = '可以备选'; verdictClass = 'b'; }
+    else if (total >= 30) { colorClass = 'orange'; verdict = '不太值得'; verdictClass = 'c'; }
+    else { colorClass = 'red'; verdict = '直接放弃'; verdictClass = 'c'; }
+  }
+
+  html += `<div class="total-score">
+    <span class="total-label">总分</span>
+    <span class="total-value ${colorClass}">${hasScores ? total : '-'}</span>
+  </div>`;
+  if (verdict) html += `<div class="verdict ${verdictClass}">${verdict}</div>`;
+  html += `</div>`;
+
+  // Tier cards
+  html += `
+    <div class="tier-card tier-a"><h3>A梯队 — 值得认真谈价</h3><ul>
+      <li>通勤 ≤35分钟</li><li>卧室南向有阳光</li><li>正规一室一厅</li>
+      <li>民水民电</li><li>噪音不明显</li><li>租金 ≤4000</li><li>评分 ≥50</li></ul></div>
+    <div class="tier-card tier-b"><h3>B梯队 — 可以备选</h3><ul>
+      <li>通勤 35-40分钟</li><li>采光一般 / 房子较旧</li><li>楼道环境一般</li><li>价格 4000+</li></ul></div>
+    <div class="tier-card tier-c"><h3>C梯队 — 直接放弃</h3><ul>
+      <li>采光差 / 北向</li><li>隔断房 / 商用电</li><li>噪音明显 / 小区环境差</li><li>通勤 >40分钟</li></ul></div>`;
+
+  // Notes
+  html += `<div class="glass-card" style="margin-top:10px">
+    <h2>备注</h2>
+    <textarea class="text-input" rows="3" placeholder="其他备注信息..."
+              oninput="state.notes=this.value;autoSaveState()">${escHtml(state.notes || '')}</textarea>
+  </div></div>`;
+
+  app.innerHTML = html;
+  updateProgress();
+}
+
+// ---- Render History ----
+function renderHistory() {
+  const page = document.getElementById('pageHistory');
+  const history = getHistory();
+
+  if (history.length === 0) {
+    page.innerHTML = `<div class="history-empty">
+      <div class="empty-icon">📋</div>
+      <p>还没有看房记录</p>
+      <p style="font-size:12px;margin-top:4px;color:var(--text-tertiary)">在清单页填写后点击「保存」</p>
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  history.forEach((item, idx) => {
+    const date = new Date(item.savedAt);
+    const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+
+    html += `<div class="history-item">
+      <div class="history-item-header">
+        <div class="history-item-name">${escHtml(item.name)}</div>
+        <div class="history-item-date">${dateStr}</div>
+      </div>
+      ${item.addr ? `<div class="history-item-addr">${escHtml(item.addr)}</div>` : ''}
+      <div class="history-item-meta">
+        <span>完成 ${item.checkedItems || 0}/${item.totalItems || 53}</span>
+        ${item.totalScore ? `<span class="history-item-score">${item.totalScore}分</span>` : ''}
+      </div>
+      <div class="history-item-actions">
+        <button class="btn-sm btn-sm-primary" onclick="loadRecord('${item.id}');event.stopPropagation()">查看编辑</button>
+        <button class="btn-sm btn-sm-danger" onclick="deleteRecord('${item.id}');event.stopPropagation()">删除</button>
+      </div>
+    </div>`;
+  });
+
+  page.innerHTML = html;
+}
+
+function loadRecord(id) {
+  const history = getHistory();
+  const record = history.find(h => h.id === id);
+  if (!record) return;
+
+  state = { ...record.state };
+  currentId = id;
+  autoSaveState();
+  switchTab('checklist');
+  renderChecklist();
+  updateBottomBar();
+}
+
+function deleteRecord(id) {
+  if (!confirm('确定删除此条记录？')) return;
+  let history = getHistory();
+  history = history.filter(h => h.id !== id);
+  saveHistory(history);
+  if (currentId === id) {
+    currentId = null;
+    autoSaveState();
+    updateBottomBar();
+  }
+  renderHistory();
+}
+
+// ---- Interaction Handlers ----
+function toggleItem(key) {
+  if (!state[key]) state[key] = {};
+  state[key].expanded = !state[key].expanded;
+  renderChecklist();
+}
+
+function selectOption(key, optIdx) {
+  if (!state[key]) state[key] = {};
+  state[key].selectedOption = optIdx;
+  state[key].checked = true;
+  autoSaveState();
+  renderChecklist();
+}
+
+function setTextValue(key, value) {
+  if (!state[key]) state[key] = {};
+  state[key].textValue = value;
+  state[key].checked = value.trim().length > 0;
+  autoSaveState();
+  updateProgress();
+}
+
+function setScore(scoreKey, value) {
+  const num = parseInt(value);
+  if (num >= 0 && num <= 10) {
+    state[`score_${scoreKey}`] = num;
+  } else {
+    delete state[`score_${scoreKey}`];
+  }
+  autoSaveState();
+  renderChecklist();
+}
+
+function updateProgress() {
+  let total = 0, checked = 0;
+  checklistData.forEach((section, sIdx) => {
+    section.items.forEach((_, iIdx) => {
+      total++;
+      if (state[getItemKey(sIdx, iIdx)]?.checked) checked++;
+    });
+  });
+  const pct = total > 0 ? (checked / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${checked} / ${total} 已完成`;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- Photo Handling ----
+function handlePhotoUpload(files) {
+  if (!files || files.length === 0) return;
+  if (!state.photos) state.photos = [];
+
+  let processed = 0;
+  const total = files.length;
+
+  Array.from(files).forEach(file => {
+    const isVideo = file.type.startsWith('video/');
+    // For large files, use object URL (won't persist across sessions but avoids localStorage limits)
+    // For small images (<500KB), use base64
+    if (file.size > 500000 || isVideo) {
+      const url = URL.createObjectURL(file);
+      state.photos.push({ src: url, type: isVideo ? 'video' : 'image', name: file.name, blob: true });
+      processed++;
+      if (processed === total) { autoSaveState(); renderChecklist(); }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.photos.push({ src: e.target.result, type: 'image', name: file.name });
+        processed++;
+        if (processed === total) { autoSaveState(); renderChecklist(); }
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function deletePhoto(idx) {
+  if (!state.photos) return;
+  state.photos.splice(idx, 1);
+  autoSaveState();
+  renderChecklist();
+}
+
+// ---- Lightbox ----
+let lightboxIndex = 0;
+
+function openLightbox(idx) {
+  lightboxIndex = idx;
+  renderLightbox();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox(e) {
+  if (e && e.target !== e.currentTarget && !e.target.classList.contains('lightbox-close')) return;
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function navLightbox(dir) {
+  const photos = state.photos || [];
+  if (photos.length === 0) return;
+  lightboxIndex = (lightboxIndex + dir + photos.length) % photos.length;
+  renderLightbox();
+}
+
+function renderLightbox() {
+  const photos = state.photos || [];
+  const p = photos[lightboxIndex];
+  if (!p) return;
+
+  const wrap = document.getElementById('lightboxContent');
+  document.getElementById('lightboxCounter').textContent = `${lightboxIndex + 1} / ${photos.length}`;
+
+  if (p.type === 'video') {
+    wrap.innerHTML = `<video src="${p.src}" controls autoplay style="max-width:100%;max-height:100%;border-radius:4px"></video>`;
+  } else {
+    wrap.innerHTML = `<img src="${p.src}" alt="照片">`;
+  }
+}
+
+// Swipe support for lightbox
+(function() {
+  let startX = 0;
+  const lb = document.getElementById('lightbox');
+  lb.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  lb.addEventListener('touchend', e => {
+    const diff = e.changedTouches[0].clientX - startX;
+    if (Math.abs(diff) > 50) navLightbox(diff > 0 ? -1 : 1);
+  }, { passive: true });
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'ArrowLeft') navLightbox(-1);
+    else if (e.key === 'ArrowRight') navLightbox(1);
+    else if (e.key === 'Escape') closeLightbox();
+  });
+})();
+
+// ---- Test Data Generator ----
+function loadTestData() {
+  state = {
+    houseName: '阳光花园小区',
+    houseAddr: '浦东新区张杨路1888弄12号楼603室',
+    photos: [
+      { src: 'https://picsum.photos/seed/room1/600/600', type: 'image', name: '客厅全景' },
+      { src: 'https://picsum.photos/seed/room2/600/600', type: 'image', name: '卧室' },
+      { src: 'https://picsum.photos/seed/room3/600/600', type: 'image', name: '厨房' },
+      { src: 'https://picsum.photos/seed/room4/600/600', type: 'image', name: '卫生间' },
+      { src: 'https://picsum.photos/seed/room5/600/600', type: 'image', name: '阳台采光' },
+      { src: 'https://picsum.photos/seed/room6/600/600', type: 'image', name: '小区楼道' },
+      { src: 'https://picsum.photos/seed/room7/600/600', type: 'image', name: '小区门口' },
+    ],
+    // 一、房屋基本信息
+    s0_i0: { checked: true, expanded: true, selectedOption: 0 },   // 一室一厅
+    s0_i1: { checked: true, expanded: true, textValue: '38' },     // 面积
+    s0_i2: { checked: true, expanded: true, textValue: '6/18' },   // 楼层
+    s0_i3: { checked: true, expanded: true, selectedOption: 0 },   // 朝向正南：是
+    s0_i4: { checked: true, expanded: true, selectedOption: 0 },   // 有电梯
+    s0_i5: { checked: true, expanded: true, selectedOption: 0 },   // 独门独户：是
+    s0_i6: { checked: true, expanded: true, selectedOption: 0 },   // 重新签合同：是
+    s0_i7: { checked: true, expanded: true, selectedOption: 0 },   // 房东
+    // 二、费用
+    s1_i0: { checked: true, expanded: true, textValue: '3800，可谈到3600' },
+    s1_i1: { checked: true, expanded: true, textValue: '押一付三' },
+    s1_i2: { checked: true, expanded: true, selectedOption: 1 },   // 无中介费
+    s1_i3: { checked: true, expanded: true, selectedOption: 0 },   // 民水民电：是
+    s1_i4: { checked: true, expanded: true, textValue: '单独付，约30/月' },
+    s1_i5: { checked: true, expanded: true, textValue: '房东付' },
+    s1_i6: { checked: true, expanded: true, textValue: '月租包含' },
+    // 三、采光与通风
+    s2_i0: { checked: true, expanded: true, selectedOption: 0 },   // 有直射阳光
+    s2_i1: { checked: true, expanded: true, selectedOption: 0 },   // 客厅有窗
+    s2_i2: { checked: true, expanded: true, selectedOption: 0 },   // 无遮挡
+    s2_i3: { checked: true, expanded: true, selectedOption: 0 },   // 有对流通风
+    // 四、噪音
+    s3_i0: { checked: true, expanded: true, selectedOption: 1 },   // 不临主路
+    s3_i1: { checked: true, expanded: true, selectedOption: 1 },   // 不靠高架
+    s3_i2: { checked: true, expanded: true, selectedOption: 1 },   // 楼上不吵
+    s3_i3: { checked: true, expanded: true, selectedOption: 0 },   // 隔音可以
+    s3_i4: { checked: true, expanded: true, textValue: '晚上比较安静，偶尔有狗叫' },
+    // 五、房屋结构
+    s4_i0: { checked: true, expanded: true, selectedOption: 1 },   // 不是暗厅
+    s4_i1: { checked: true, expanded: true, selectedOption: 1 },   // 不是暗厨
+    s4_i2: { checked: true, expanded: true, selectedOption: 0 },   // 厨房封闭
+    s4_i3: { checked: true, expanded: true, selectedOption: 0 },   // 干湿分离
+    s4_i4: { checked: true, expanded: true, selectedOption: 0 },   // 房间方正
+    // 六、设施
+    s5_i0: { checked: true, expanded: true, textValue: '1台挂机，正常运行' },
+    s5_i1: { checked: true, expanded: true, selectedOption: 0 },   // 有洗衣机
+    s5_i2: { checked: true, expanded: true, selectedOption: 0 },   // 有冰箱
+    s5_i3: { checked: true, expanded: true, selectedOption: 0 },   // 有热水器
+    s5_i4: { checked: true, expanded: true, selectedOption: 0 },   // 有燃气灶
+    s5_i5: { checked: true, expanded: true, selectedOption: 0 },   // 家具齐全
+    // 七、小区环境
+    s6_i0: { checked: true, expanded: true, selectedOption: 0 },   // 楼道干净
+    s6_i1: { checked: true, expanded: true, selectedOption: 1 },   // 无群租
+    s6_i2: { checked: true, expanded: true, selectedOption: 0 },   // 外卖多
+    s6_i3: { checked: true, expanded: true, selectedOption: 1 },   // 垃圾点远
+    // 八、通勤
+    s7_i0: { checked: true, expanded: true, textValue: '8分钟' },
+    s7_i1: { checked: true, expanded: true, textValue: '2号线、9号线' },
+    s7_i2: { checked: true, expanded: true, selectedOption: 1 },   // 一般
+    // 九、转租确认
+    s8_i0: { checked: true, expanded: true, textValue: '工作调动到其他城市' },
+    s8_i1: { checked: true, expanded: true, selectedOption: 0 },   // 房东同意
+    s8_i2: { checked: true, expanded: true, textValue: '直接退还给新租客' },
+    s8_i3: { checked: true, expanded: true, selectedOption: 0 },   // 重新签合同
+    // 十、维修与责任
+    s9_i0: { checked: true, expanded: true, selectedOption: 0 },   // 房东负责
+    s9_i1: { checked: true, expanded: true, selectedOption: 0 },   // 房东负责
+    s9_i2: { checked: true, expanded: true, selectedOption: 0 },   // 有物业
+    // 十一、合同条款
+    s10_i0: { checked: true, expanded: true, textValue: '一年，可协商提前' },
+    s10_i1: { checked: true, expanded: true, selectedOption: 0 },  // 允许提前解约
+    s10_i2: { checked: true, expanded: true, selectedOption: 0 },  // 允许转租
+    s10_i3: { checked: true, expanded: true, textValue: '提前一个月通知，扣半月租金' },
+    // 评分
+    score_light: 9,
+    score_quiet: 8,
+    score_commute: 9,
+    score_structure: 8,
+    score_condition: 7,
+    score_price: 8,
+    notes: '整体不错，房东人很好说话，价格有空间。小区附近有菜市场和便利店，生活方便。建议尽快定下来。',
+  };
+  currentId = null;
+  autoSaveState();
+  renderChecklist();
+  updateBottomBar();
+  window.scrollTo(0, 0);
+}
+
+// ---- Init ----
+loadState();
+// Auto-load test data if empty
+if (!state.houseName && !Object.keys(state).some(k => k.startsWith('s'))) {
+  loadTestData();
+}
+renderChecklist();
+updateBottomBar();
+</script>
+</body>
+</html>
