@@ -937,10 +937,7 @@
   <div class="page" id="pageHistory"></div>
 </div>
 
-<div class="bottom-bar">
-  <button class="btn btn-primary" id="btnSave" onclick="handleSave()">保存</button>
-  <button class="btn btn-ghost" onclick="resetAll()">重置</button>
-</div>
+<div class="bottom-bar" id="bottomBar"></div>
 
 <!-- Lightbox -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
@@ -1076,6 +1073,7 @@ const scoreItems = [
 let state = {};
 let currentId = null; // null = new unsaved, string = saved record id
 let currentTab = 'checklist';
+let viewMode = false; // true = viewing a history record (read-only before clicking 编辑)
 
 function loadState() {
   const saved = localStorage.getItem('house-cl-current');
@@ -1123,17 +1121,39 @@ function switchTab(tab) {
 
 // ---- Bottom Bar ----
 function updateBottomBar() {
-  const btn = document.getElementById('btnSave');
+  const bar = document.getElementById('bottomBar');
   if (currentTab === 'history') {
-    btn.textContent = '新建';
-    btn.onclick = handleNew;
-  } else if (currentId) {
-    btn.textContent = '新建';
-    btn.onclick = handleNew;
-  } else {
-    btn.textContent = '保存';
-    btn.onclick = handleSave;
+    bar.style.display = 'none';
+    return;
   }
+  bar.style.display = '';
+
+  if (viewMode) {
+    // Viewing a history record — show 编辑 + 返回
+    bar.innerHTML = `
+      <button class="btn btn-primary" onclick="enterEdit()">编辑</button>
+      <button class="btn btn-ghost" onclick="backToHistory()">返回</button>`;
+  } else if (currentId) {
+    // Editing a saved record — show 保存 + 重置
+    bar.innerHTML = `
+      <button class="btn btn-primary" id="btnSave" onclick="handleSave()">保存</button>
+      <button class="btn btn-ghost" onclick="resetAll()">重置</button>`;
+  } else {
+    // New record — show 保存 + 重置
+    bar.innerHTML = `
+      <button class="btn btn-primary" id="btnSave" onclick="handleSave()">保存</button>
+      <button class="btn btn-ghost" onclick="resetAll()">重置</button>`;
+  }
+}
+
+function enterEdit() {
+  viewMode = false;
+  updateBottomBar();
+}
+
+function backToHistory() {
+  viewMode = false;
+  switchTab('history');
 }
 
 function handleSave() {
@@ -1179,14 +1199,9 @@ function handleSave() {
 }
 
 function handleNew() {
-  // Auto-save current if it has data
-  const hasData = state.houseName || Object.keys(state).some(k => k.startsWith('s') && state[k]?.checked);
-  if (hasData && !currentId) {
-    handleSave();
-  }
-
   state = {};
   currentId = null;
+  viewMode = false;
   autoSaveState();
   switchTab('checklist');
   renderChecklist();
@@ -1392,7 +1407,7 @@ function renderHistory() {
         ${item.totalScore ? `<span class="history-item-score">${item.totalScore}分</span>` : ''}
       </div>
       <div class="history-item-actions">
-        <button class="btn-sm btn-sm-primary" onclick="loadRecord('${item.id}');event.stopPropagation()">查看编辑</button>
+        <button class="btn-sm btn-sm-primary" onclick="loadRecord('${item.id}');event.stopPropagation()">查看</button>
         <button class="btn-sm btn-sm-danger" onclick="deleteRecord('${item.id}');event.stopPropagation()">删除</button>
       </div>
     </div>`;
@@ -1408,6 +1423,7 @@ function loadRecord(id) {
 
   state = { ...record.state };
   currentId = id;
+  viewMode = true;
   autoSaveState();
   switchTab('checklist');
   renderChecklist();
