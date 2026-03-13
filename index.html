@@ -1153,7 +1153,11 @@ function enterEdit() {
 }
 
 function backToHistory() {
+  // Clear current data so checklist tab shows a fresh blank form
+  state = {};
+  currentId = null;
   viewMode = false;
+  autoSaveState();
   switchTab('history');
 }
 
@@ -1167,7 +1171,7 @@ function handleSave() {
 
   const entry = {
     id,
-    state: { ...state },
+    state: JSON.parse(JSON.stringify(state)),
     name: state.houseName || '未命名房源',
     addr: state.houseAddr || '',
     savedAt: new Date().toISOString(),
@@ -1716,10 +1720,6 @@ function loadTestData() {
 
 // ---- Init ----
 loadState();
-// Auto-load test data only on very first use (no history exists)
-if (!state.houseName && !Object.keys(state).some(k => k.startsWith('s')) && getHistory().length === 0) {
-  loadTestData();
-}
 renderChecklist();
 updateBottomBar();
 </script>
