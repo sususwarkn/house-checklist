@@ -909,6 +909,11 @@
     background: rgba(255,255,255,0.25);
   }
 
+  /* ---- Upload spinner ---- */
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ---- Scrollbar ---- */
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -953,14 +958,78 @@
 // vConsole for debugging
 if (typeof VConsole !== 'undefined') {
   const vc = new VConsole();
-  // Add quick "清除数据" command
-  console.log('%c[调试] 输入 clearAll() 可清除所有本地数据', 'color:#6BBFC3;font-weight:bold');
+  console.log('%c[调试] 输入 clearAll() 可清除所有本地数据（含照片）', 'color:#6BBFC3;font-weight:bold');
 }
 window.clearAll = function() {
   localStorage.removeItem('house-cl-current');
   localStorage.removeItem('house-cl-history');
-  location.reload();
+  // Also clear IndexedDB photos
+  photoDB.clearAll().then(() => location.reload()).catch(() => location.reload());
 };
+
+// ---- IndexedDB Photo Storage ----
+// Photos are stored in IndexedDB to avoid localStorage's ~5MB limit.
+// state.photos[] only keeps metadata { id, type, name, thumbOnly }.
+// Actual base64 data lives in IndexedDB keyed by photo id.
+var photoDB = (() => {
+  const DB_NAME = 'house-cl-photos';
+  const STORE = 'photos';
+  let _db = null;
+
+  function open() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        e.target.result.createObjectStore(STORE);
+      };
+      req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+      req.onerror = (e) => { console.error('IndexedDB open failed:', e); reject(e); };
+    });
+  }
+
+  async function put(id, data) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(data, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    });
+  }
+
+  async function get(id) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e);
+    });
+  }
+
+  async function del(id) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    });
+  }
+
+  async function clearAll() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    });
+  }
+
+  return { open, put, get, del, clearAll };
+})();
 
 const checklistData = [
   {
@@ -1139,7 +1208,7 @@ function switchTab(tab) {
   document.getElementById('progressWrap').style.display = tab === 'checklist' ? '' : 'none';
 
   if (tab === 'history') renderHistory();
-  if (tab === 'checklist') { renderChecklist(); updateProgress(); }
+  if (tab === 'checklist') { renderChecklist(); updateProgress(); loadPhotoThumbs(); }
   updateBottomBar();
 }
 
@@ -1238,8 +1307,13 @@ function handleNew() {
   updateBottomBar();
 }
 
-function resetAll() {
+async function resetAll() {
   if (confirm('确定要清空当前清单所有内容吗？')) {
+    // Delete photos from IndexedDB
+    const photos = state.photos || [];
+    for (const p of photos) {
+      if (p.id) try { await photoDB.del(p.id); } catch(e) {}
+    }
     state = {};
     currentId = null;
     autoSaveState();
@@ -1278,14 +1352,16 @@ function renderChecklist() {
 
   photos.forEach((p, idx) => {
     const isVideo = p.type === 'video';
-    // Both images and video thumbnails render as <img>
-    const imgSrc = p.src || '';
-    const placeholder = imgSrc ? '' : 'style="display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px"';
     html += `<div class="photo-thumb" onclick="openLightbox(${idx})">`;
-    if (imgSrc) {
-      html += `<img src="${imgSrc}" alt="${isVideo ? '视频截图' : '照片' + (idx+1)}">`;
+    if (p.id) {
+      // New format: photo data in IndexedDB, load async
+      html += `<img id="photo_${p.id}" src="" alt="${isVideo ? '视频截图' : '照片' + (idx+1)}" style="background:#f0f0f0">`;
+    } else if (p.src && !p.src.startsWith('blob:')) {
+      // Legacy inline base64 (from before IndexedDB migration)
+      html += `<img src="${p.src}" alt="${isVideo ? '视频截图' : '照片' + (idx+1)}">`;
     } else {
-      html += `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px">无预览</div>`;
+      // Broken blob URL or no data
+      html += `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px">已失效</div>`;
     }
     if (isVideo) html += `<span class="video-badge">视频</span>`;
     html += `<button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
@@ -1451,18 +1527,27 @@ function loadRecord(id) {
   const record = history.find(h => h.id === id);
   if (!record) return;
 
-  state = { ...record.state };
+  state = JSON.parse(JSON.stringify(record.state));
   currentId = id;
   viewMode = true;
   autoSaveState();
   switchTab('checklist');
   renderChecklist();
   updateBottomBar();
+  // Load photo thumbnails from IndexedDB
+  loadPhotoThumbs();
 }
 
-function deleteRecord(id) {
+async function deleteRecord(id) {
   if (!confirm('确定删除此条记录？')) return;
   let history = getHistory();
+  // Clean up photos in IndexedDB for this record
+  const record = history.find(h => h.id === id);
+  if (record?.state?.photos) {
+    for (const p of record.state.photos) {
+      if (p.id) try { await photoDB.del(p.id); } catch(e) {}
+    }
+  }
   history = history.filter(h => h.id !== id);
   saveHistory(history);
   if (currentId === id) {
@@ -1524,9 +1609,9 @@ function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ---- Photo Handling ----
+// ---- Photo Handling (IndexedDB) ----
 function compressImage(file, maxWidth, quality) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -1544,6 +1629,7 @@ function compressImage(file, maxWidth, quality) {
       // Fallback to FileReader
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
       reader.readAsDataURL(file);
     };
     img.src = url;
@@ -1554,71 +1640,144 @@ function getVideoThumbnail(file) {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
-    video.preload = 'metadata';
+
+    // Timeout: if thumbnail extraction takes > 15s, give up
+    const timer = setTimeout(() => {
+      console.warn('视频缩略图提取超时');
+      URL.revokeObjectURL(url);
+      resolve('');
+    }, 15000);
+
+    video.preload = 'auto';
     video.muted = true;
     video.playsInline = true;
     video.onloadeddata = () => {
-      video.currentTime = 0.5; // seek to 0.5s for thumbnail
+      video.currentTime = 0.5;
     };
     video.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      const w = Math.min(video.videoWidth, 400);
-      const h = video.videoHeight * w / video.videoWidth;
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-      const thumb = canvas.toDataURL('image/jpeg', 0.6);
-      URL.revokeObjectURL(url);
-      resolve(thumb);
+      clearTimeout(timer);
+      try {
+        const canvas = document.createElement('canvas');
+        const vw = video.videoWidth || 400;
+        const vh = video.videoHeight || 300;
+        const w = Math.min(vw, 400);
+        const h = vh * w / vw;
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        const thumb = canvas.toDataURL('image/jpeg', 0.6);
+        URL.revokeObjectURL(url);
+        resolve(thumb);
+      } catch(e) {
+        URL.revokeObjectURL(url);
+        resolve('');
+      }
     };
     video.onerror = () => {
+      clearTimeout(timer);
       URL.revokeObjectURL(url);
-      resolve(''); // fallback: no thumbnail
+      resolve('');
     };
     video.src = url;
   });
 }
 
-function handlePhotoUpload(files) {
+// Show/hide upload loading overlay
+function showUploadLoading(show, text) {
+  let overlay = document.getElementById('uploadOverlay');
+  if (show) {
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'uploadOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)';
+      overlay.innerHTML = `<div style="background:white;border-radius:16px;padding:28px 36px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+        <div style="width:36px;height:36px;border:3px solid #e0e0e0;border-top-color:var(--brand);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px"></div>
+        <div id="uploadOverlayText" style="font-size:14px;color:var(--text-secondary)">${text || '处理中...'}</div>
+      </div>`;
+      document.body.appendChild(overlay);
+    } else {
+      overlay.style.display = 'flex';
+      const t = document.getElementById('uploadOverlayText');
+      if (t) t.textContent = text || '处理中...';
+    }
+  } else if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+async function handlePhotoUpload(files) {
   if (!files || files.length === 0) return;
   if (!state.photos) state.photos = [];
 
-  let processed = 0;
   const total = files.length;
+  let processed = 0;
+  showUploadLoading(true, `正在处理 0/${total}...`);
 
-  Array.from(files).forEach(async (file) => {
+  for (const file of Array.from(files)) {
     const isVideo = file.type.startsWith('video/');
-    if (isVideo) {
-      // Videos: only store a thumbnail frame, not the full video (too large for localStorage)
-      try {
+    const photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+
+    try {
+      if (isVideo) {
+        showUploadLoading(true, `正在提取视频缩略图 ${processed+1}/${total}...`);
         const thumb = await getVideoThumbnail(file);
-        state.photos.push({ src: thumb, type: 'video', name: file.name, thumbOnly: true });
-      } catch(e) {
-        state.photos.push({ src: '', type: 'video', name: file.name, thumbOnly: true });
-      }
-      processed++;
-      if (processed === total) { autoSaveState(); renderChecklist(); }
-    } else {
-      // Images: compress via canvas to keep localStorage manageable
-      try {
+        // Store thumbnail in IndexedDB
+        if (thumb) {
+          await photoDB.put(photoId, thumb);
+        }
+        state.photos.push({ id: photoId, type: 'video', name: file.name, thumbOnly: true });
+      } else {
+        showUploadLoading(true, `正在压缩照片 ${processed+1}/${total}...`);
         const dataUrl = await compressImage(file, 1200, 0.7);
-        state.photos.push({ src: dataUrl, type: 'image', name: file.name });
-      } catch(e) {
-        const reader = new FileReader();
-        const result = await new Promise(r => { reader.onload = ev => r(ev.target.result); reader.readAsDataURL(file); });
-        state.photos.push({ src: result, type: 'image', name: file.name });
+        // Store compressed image in IndexedDB
+        await photoDB.put(photoId, dataUrl);
+        state.photos.push({ id: photoId, type: 'image', name: file.name });
       }
-      processed++;
-      if (processed === total) { autoSaveState(); renderChecklist(); }
+    } catch(e) {
+      console.error('处理文件失败:', file.name, e);
+      state.photos.push({ id: photoId, type: isVideo ? 'video' : 'image', name: file.name });
     }
-  });
+
+    processed++;
+  }
+
+  showUploadLoading(false);
+  autoSaveState();
+  renderChecklist();
+  // Load newly added photo thumbnails
+  loadPhotoThumbs();
 }
 
-function deletePhoto(idx) {
+async function deletePhoto(idx) {
   if (!state.photos) return;
+  const photo = state.photos[idx];
+  // Remove from IndexedDB
+  if (photo && photo.id) {
+    try { await photoDB.del(photo.id); } catch(e) {}
+  }
   state.photos.splice(idx, 1);
   autoSaveState();
   renderChecklist();
+  loadPhotoThumbs();
+}
+
+// Async load photo thumbnails from IndexedDB into rendered <img> elements
+async function loadPhotoThumbs() {
+  const photos = state.photos || [];
+  for (let i = 0; i < photos.length; i++) {
+    const p = photos[i];
+    if (!p.id) continue;
+    const img = document.getElementById('photo_' + p.id);
+    if (!img) continue;
+    if (img.dataset.loaded === '1') continue;
+    try {
+      const data = await photoDB.get(p.id);
+      if (data) {
+        img.src = data;
+        img.dataset.loaded = '1';
+      }
+    } catch(e) {}
+  }
 }
 
 // ---- Lightbox ----
@@ -1644,7 +1803,7 @@ function navLightbox(dir) {
   renderLightbox();
 }
 
-function renderLightbox() {
+async function renderLightbox() {
   const photos = state.photos || [];
   const p = photos[lightboxIndex];
   if (!p) return;
@@ -1652,12 +1811,26 @@ function renderLightbox() {
   const wrap = document.getElementById('lightboxContent');
   document.getElementById('lightboxCounter').textContent = `${lightboxIndex + 1} / ${photos.length}`;
 
-  if (p.src) {
-    // Both images and video thumbnails display as images in lightbox
-    const label = p.type === 'video' ? '<div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:8px;text-align:center">视频截图（原视频未保存）</div>' : '';
+  const label = p.type === 'video' ? '<div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:8px;text-align:center">视频截图（原视频未保存）</div>' : '';
+
+  // Try loading from IndexedDB first
+  if (p.id) {
+    wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">加载中...</div>`;
+    try {
+      const data = await photoDB.get(p.id);
+      if (data) {
+        wrap.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center"><img src="${data}" alt="照片">${label}</div>`;
+      } else {
+        wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">照片数据丢失</div>`;
+      }
+    } catch(e) {
+      wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">加载失败</div>`;
+    }
+  } else if (p.src && !p.src.startsWith('blob:')) {
+    // Legacy inline base64
     wrap.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center"><img src="${p.src}" alt="照片">${label}</div>`;
   } else {
-    wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">无预览</div>`;
+    wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">照片已失效</div>`;
   }
 }
 
@@ -1773,10 +1946,78 @@ function loadTestData() {
   window.scrollTo(0, 0);
 }
 
+// ---- Migrate old data: move inline base64 from state.photos to IndexedDB ----
+async function migratePhotosToIDB() {
+  const photos = state.photos || [];
+  let changed = false;
+  for (const p of photos) {
+    // Skip if already migrated (has id, no src)
+    if (p.id && !p.src) continue;
+    // Skip broken blob URLs
+    if (p.src && p.src.startsWith('blob:')) {
+      // Mark as broken, remove src
+      p.src = '';
+      changed = true;
+      continue;
+    }
+    // Migrate inline base64 to IndexedDB
+    if (p.src && p.src.startsWith('data:')) {
+      const photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      try {
+        await photoDB.put(photoId, p.src);
+        p.id = photoId;
+        delete p.src;
+        changed = true;
+      } catch(e) {
+        console.error('迁移照片失败:', e);
+      }
+    }
+  }
+  if (changed) {
+    autoSaveState();
+  }
+
+  // Also migrate history records
+  const history = getHistory();
+  let historyChanged = false;
+  for (const record of history) {
+    const rPhotos = record.state?.photos || [];
+    for (const p of rPhotos) {
+      if (p.id && !p.src) continue;
+      if (p.src && p.src.startsWith('blob:')) {
+        p.src = '';
+        historyChanged = true;
+        continue;
+      }
+      if (p.src && p.src.startsWith('data:')) {
+        const photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        try {
+          await photoDB.put(photoId, p.src);
+          p.id = photoId;
+          delete p.src;
+          historyChanged = true;
+        } catch(e) {}
+      }
+    }
+  }
+  if (historyChanged) {
+    saveHistory(history);
+  }
+}
+
 // ---- Init ----
 loadState();
 renderChecklist();
 updateBottomBar();
+
+// Init IndexedDB & migrate, then load photo thumbs
+photoDB.open().then(() => {
+  return migratePhotosToIDB();
+}).then(() => {
+  loadPhotoThumbs();
+  renderChecklist();
+  loadPhotoThumbs();
+}).catch(e => console.error('IndexedDB初始化失败:', e));
 </script>
 </body>
 </html>
