@@ -1640,22 +1640,17 @@ function getVideoThumbnail(file) {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
+    let resolved = false;
 
-    // Timeout: if thumbnail extraction takes > 15s, give up
-    const timer = setTimeout(() => {
-      console.warn('视频缩略图提取超时');
-      URL.revokeObjectURL(url);
-      resolve('');
-    }, 15000);
-
-    video.preload = 'auto';
-    video.muted = true;
-    video.playsInline = true;
-    video.onloadeddata = () => {
-      video.currentTime = 0.5;
-    };
-    video.onseeked = () => {
+    function done(thumb) {
+      if (resolved) return;
+      resolved = true;
       clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      resolve(thumb || makeVideoPlaceholder(file.name));
+    }
+
+    function extractFrame() {
       try {
         const canvas = document.createElement('canvas');
         const vw = video.videoWidth || 400;
@@ -1665,21 +1660,45 @@ function getVideoThumbnail(file) {
         canvas.width = w;
         canvas.height = h;
         canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-        const thumb = canvas.toDataURL('image/jpeg', 0.6);
-        URL.revokeObjectURL(url);
-        resolve(thumb);
+        done(canvas.toDataURL('image/jpeg', 0.6));
       } catch(e) {
-        URL.revokeObjectURL(url);
-        resolve('');
+        done('');
       }
+    }
+
+    const timer = setTimeout(() => done(''), 10000);
+
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('webkit-playsinline', '');
+    video.onseeked = extractFrame;
+    video.onloadeddata = () => { video.currentTime = 0.5; };
+    // Fallback: some mobile browsers need loadedmetadata + canplay
+    video.onloadedmetadata = () => {
+      if (video.readyState >= 1) video.currentTime = 0.5;
     };
-    video.onerror = () => {
-      clearTimeout(timer);
-      URL.revokeObjectURL(url);
-      resolve('');
-    };
+    video.onerror = () => done('');
     video.src = url;
+    // Force load on iOS Safari
+    video.load();
   });
+}
+
+// Generate a simple placeholder image for videos when thumbnail extraction fails
+function makeVideoPlaceholder(name) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 200; canvas.height = 200;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#e0e0e0';
+  ctx.fillRect(0, 0, 200, 200);
+  ctx.fillStyle = '#999';
+  ctx.font = 'bold 48px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('▶', 100, 115);
+  ctx.font = '13px sans-serif';
+  ctx.fillText('视频', 100, 155);
+  return canvas.toDataURL('image/jpeg', 0.8);
 }
 
 // Show/hide upload loading overlay
@@ -1711,30 +1730,28 @@ async function handlePhotoUpload(files) {
 
   const total = files.length;
   let processed = 0;
-  showUploadLoading(true, `正在处理 0/${total}...`);
+  showUploadLoading(true, `上传中... ${processed}/${total}`);
 
   for (const file of Array.from(files)) {
     const isVideo = file.type.startsWith('video/');
     const photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
+    showUploadLoading(true, `上传中... ${processed+1}/${total}`);
     try {
       if (isVideo) {
-        showUploadLoading(true, `正在提取视频缩略图 ${processed+1}/${total}...`);
         const thumb = await getVideoThumbnail(file);
-        // Store thumbnail in IndexedDB
-        if (thumb) {
-          await photoDB.put(photoId, thumb);
-        }
+        await photoDB.put(photoId, thumb);
         state.photos.push({ id: photoId, type: 'video', name: file.name, thumbOnly: true });
       } else {
-        showUploadLoading(true, `正在压缩照片 ${processed+1}/${total}...`);
-        const dataUrl = await compressImage(file, 1200, 0.7);
-        // Store compressed image in IndexedDB
+        const dataUrl = await compressImage(file, 800, 0.7);
         await photoDB.put(photoId, dataUrl);
         state.photos.push({ id: photoId, type: 'image', name: file.name });
       }
     } catch(e) {
       console.error('处理文件失败:', file.name, e);
+      // Still add entry with a placeholder
+      const placeholder = makeVideoPlaceholder(file.name);
+      await photoDB.put(photoId, placeholder).catch(() => {});
       state.photos.push({ id: photoId, type: isVideo ? 'video' : 'image', name: file.name });
     }
 
