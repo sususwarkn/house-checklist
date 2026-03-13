@@ -948,7 +948,20 @@
   <div class="lightbox-img-wrap" id="lightboxContent"></div>
 </div>
 
+<script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
 <script>
+// vConsole for debugging
+if (typeof VConsole !== 'undefined') {
+  const vc = new VConsole();
+  // Add quick "清除数据" command
+  console.log('%c[调试] 输入 clearAll() 可清除所有本地数据', 'color:#6BBFC3;font-weight:bold');
+}
+window.clearAll = function() {
+  localStorage.removeItem('house-cl-current');
+  localStorage.removeItem('house-cl-history');
+  location.reload();
+};
+
 const checklistData = [
   {
     title: "一、房屋基本信息", icon: "🏠",
@@ -1090,7 +1103,12 @@ function loadState() {
 }
 
 function autoSaveState() {
-  localStorage.setItem('house-cl-current', JSON.stringify({ state, currentId }));
+  try {
+    localStorage.setItem('house-cl-current', JSON.stringify({ state, currentId }));
+  } catch(e) {
+    console.error('localStorage写入失败，数据可能过大:', e);
+    alert('存储空间不足，请删除部分照片后重试');
+  }
 }
 
 function getHistory() {
@@ -1099,7 +1117,12 @@ function getHistory() {
 }
 
 function saveHistory(history) {
-  localStorage.setItem('house-cl-history', JSON.stringify(history));
+  try {
+    localStorage.setItem('house-cl-history', JSON.stringify(history));
+  } catch(e) {
+    console.error('历史记录保存失败，数据可能过大:', e);
+    alert('存储空间不足，请删除部分历史记录或照片后重试');
+  }
 }
 
 function getItemKey(sIdx, iIdx) {
@@ -1255,18 +1278,18 @@ function renderChecklist() {
 
   photos.forEach((p, idx) => {
     const isVideo = p.type === 'video';
-    if (isVideo) {
-      html += `<div class="photo-thumb" onclick="openLightbox(${idx})">
-        <video src="${p.src}" muted preload="metadata"></video>
-        <span class="video-badge">视频</span>
-        <button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
-      </div>`;
+    // Both images and video thumbnails render as <img>
+    const imgSrc = p.src || '';
+    const placeholder = imgSrc ? '' : 'style="display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px"';
+    html += `<div class="photo-thumb" onclick="openLightbox(${idx})">`;
+    if (imgSrc) {
+      html += `<img src="${imgSrc}" alt="${isVideo ? '视频截图' : '照片' + (idx+1)}">`;
     } else {
-      html += `<div class="photo-thumb" onclick="openLightbox(${idx})">
-        <img src="${p.src}" alt="照片${idx+1}">
-        <button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
-      </div>`;
+      html += `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px">无预览</div>`;
     }
+    if (isVideo) html += `<span class="video-badge">视频</span>`;
+    html += `<button class="photo-delete" onclick="deletePhoto(${idx});event.stopPropagation()">&times;</button>
+      </div>`;
   });
 
   html += `<label class="photo-add-btn">
@@ -1527,6 +1550,35 @@ function compressImage(file, maxWidth, quality) {
   });
 }
 
+function getVideoThumbnail(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadeddata = () => {
+      video.currentTime = 0.5; // seek to 0.5s for thumbnail
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      const w = Math.min(video.videoWidth, 400);
+      const h = video.videoHeight * w / video.videoWidth;
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+      const thumb = canvas.toDataURL('image/jpeg', 0.6);
+      URL.revokeObjectURL(url);
+      resolve(thumb);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(''); // fallback: no thumbnail
+    };
+    video.src = url;
+  });
+}
+
 function handlePhotoUpload(files) {
   if (!files || files.length === 0) return;
   if (!state.photos) state.photos = [];
@@ -1537,14 +1589,15 @@ function handlePhotoUpload(files) {
   Array.from(files).forEach(async (file) => {
     const isVideo = file.type.startsWith('video/');
     if (isVideo) {
-      // Videos: use base64 but warn if very large
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        state.photos.push({ src: e.target.result, type: 'video', name: file.name });
-        processed++;
-        if (processed === total) { autoSaveState(); renderChecklist(); }
-      };
-      reader.readAsDataURL(file);
+      // Videos: only store a thumbnail frame, not the full video (too large for localStorage)
+      try {
+        const thumb = await getVideoThumbnail(file);
+        state.photos.push({ src: thumb, type: 'video', name: file.name, thumbOnly: true });
+      } catch(e) {
+        state.photos.push({ src: '', type: 'video', name: file.name, thumbOnly: true });
+      }
+      processed++;
+      if (processed === total) { autoSaveState(); renderChecklist(); }
     } else {
       // Images: compress via canvas to keep localStorage manageable
       try {
@@ -1599,10 +1652,12 @@ function renderLightbox() {
   const wrap = document.getElementById('lightboxContent');
   document.getElementById('lightboxCounter').textContent = `${lightboxIndex + 1} / ${photos.length}`;
 
-  if (p.type === 'video') {
-    wrap.innerHTML = `<video src="${p.src}" controls autoplay style="max-width:100%;max-height:100%;border-radius:4px"></video>`;
+  if (p.src) {
+    // Both images and video thumbnails display as images in lightbox
+    const label = p.type === 'video' ? '<div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:8px;text-align:center">视频截图（原视频未保存）</div>' : '';
+    wrap.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center"><img src="${p.src}" alt="照片">${label}</div>`;
   } else {
-    wrap.innerHTML = `<img src="${p.src}" alt="照片">`;
+    wrap.innerHTML = `<div style="color:rgba(255,255,255,0.5);font-size:14px">无预览</div>`;
   }
 }
 
