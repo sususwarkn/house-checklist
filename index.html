@@ -1116,6 +1116,7 @@ function switchTab(tab) {
   document.getElementById('progressWrap').style.display = tab === 'checklist' ? '' : 'none';
 
   if (tab === 'history') renderHistory();
+  if (tab === 'checklist') { renderChecklist(); updateProgress(); }
   updateBottomBar();
 }
 
@@ -1183,19 +1184,21 @@ function handleSave() {
   }
 
   saveHistory(history);
-  currentId = id;
-  autoSaveState();
-  updateBottomBar();
 
-  // Brief visual feedback
+  // After saving, clear current state and jump to history
+  state = {};
+  currentId = null;
+  viewMode = false;
+  autoSaveState();
+
+  // Brief visual feedback then switch to history
   const btn = document.getElementById('btnSave');
-  const origText = btn.textContent;
   btn.textContent = '已保存';
   btn.style.background = 'linear-gradient(135deg, var(--accent-green), #2D8068)';
   setTimeout(() => {
-    btn.style.background = '';
-    updateBottomBar();
-  }, 1200);
+    switchTab('history');
+    renderChecklist(); // pre-render blank checklist for next tab switch
+  }, 600);
 }
 
 function handleNew() {
@@ -1495,6 +1498,31 @@ function escHtml(str) {
 }
 
 // ---- Photo Handling ----
+function compressImage(file, maxWidth, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = h * maxWidth / w; w = maxWidth; }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // Fallback to FileReader
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
+  });
+}
+
 function handlePhotoUpload(files) {
   if (!files || files.length === 0) return;
   if (!state.photos) state.photos = [];
@@ -1502,23 +1530,29 @@ function handlePhotoUpload(files) {
   let processed = 0;
   const total = files.length;
 
-  Array.from(files).forEach(file => {
+  Array.from(files).forEach(async (file) => {
     const isVideo = file.type.startsWith('video/');
-    // For large files, use object URL (won't persist across sessions but avoids localStorage limits)
-    // For small images (<500KB), use base64
-    if (file.size > 500000 || isVideo) {
-      const url = URL.createObjectURL(file);
-      state.photos.push({ src: url, type: isVideo ? 'video' : 'image', name: file.name, blob: true });
-      processed++;
-      if (processed === total) { autoSaveState(); renderChecklist(); }
-    } else {
+    if (isVideo) {
+      // Videos: use base64 but warn if very large
       const reader = new FileReader();
       reader.onload = (e) => {
-        state.photos.push({ src: e.target.result, type: 'image', name: file.name });
+        state.photos.push({ src: e.target.result, type: 'video', name: file.name });
         processed++;
         if (processed === total) { autoSaveState(); renderChecklist(); }
       };
       reader.readAsDataURL(file);
+    } else {
+      // Images: compress via canvas to keep localStorage manageable
+      try {
+        const dataUrl = await compressImage(file, 1200, 0.7);
+        state.photos.push({ src: dataUrl, type: 'image', name: file.name });
+      } catch(e) {
+        const reader = new FileReader();
+        const result = await new Promise(r => { reader.onload = ev => r(ev.target.result); reader.readAsDataURL(file); });
+        state.photos.push({ src: result, type: 'image', name: file.name });
+      }
+      processed++;
+      if (processed === total) { autoSaveState(); renderChecklist(); }
     }
   });
 }
@@ -1682,8 +1716,8 @@ function loadTestData() {
 
 // ---- Init ----
 loadState();
-// Auto-load test data if empty
-if (!state.houseName && !Object.keys(state).some(k => k.startsWith('s'))) {
+// Auto-load test data only on very first use (no history exists)
+if (!state.houseName && !Object.keys(state).some(k => k.startsWith('s')) && getHistory().length === 0) {
   loadTestData();
 }
 renderChecklist();
